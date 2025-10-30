@@ -1,179 +1,181 @@
 # Backend Structure Document
 
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
+This document outlines the backend setup for the "Exotic Roleplay Gateway" starter template. It covers the overall architecture, database management, API design, hosting, infrastructure components, security, monitoring, and maintenance.
 
 ## 1. Backend Architecture
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+**Overview**
+- Built on Next.js using the App Router.
+- All backend logic lives in the `app/api` folder as Next.js API routes.
+- Authentication and database access are handled through separate modules for clear separation of concerns.
 
-- **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
+**Design Patterns and Frameworks**
+- **API Routes**: Each REST endpoint is a file under `app/api/*/route.ts`, following Next.js conventions.
+- **Modular Structure**: Business logic is split into:
+  - `app/api` for route handlers
+  - `lib` for utilities (e.g., `auth.ts`)
+  - `db` for schema definitions and connection
+- **ORM**: Drizzle ORM provides type-safe database operations and migrations.
 
-- **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
-
-- **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+**Scalability, Maintainability, Performance**
+- **Serverless-Friendly**: Next.js API routes can be deployed as serverless functions, scaling on demand.
+- **Type Safety**: TypeScript + Drizzle reduces runtime errors, making it easier to extend and refactor.
+- **Containerization**: Docker ensures consistent environments across development and production.
+- **Cacheable Endpoints**: Next.js settings allow caching of API responses where applicable.
 
 ## 2. Database Management
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+**Technology**
+- PostgreSQL (relational SQL database).
+- Drizzle ORM for type-safe queries and schema definitions.
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
+**Data Flow**
+- Connection configuration in `db/index.ts` reads environment variables for host, port, user, password, and database name.
+- Schemas defined in `db/schema/*.ts` map directly to database tables.
+- Drizzle handles query building, migrations, and type inference.
 
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+**Data Practices**
+- **Migrations**: Manage schema changes over time using Drizzle’s migration tooling.
+- **Environment Variables**: Store sensitive database credentials in `.env` files, not in source control.
+- **Pooling**: Use connection pooling (configured in Drizzle) to manage concurrent database connections.
 
 ## 3. Database Schema
 
-### Human-Readable Format
+**Human-Readable Description**
+- **users**: Stores user credentials and profile details.
+  - `id`: Unique identifier
+  - `email`: User email, unique
+  - `hashed_password`: Securely hashed password
+  - `created_at`: Timestamp of account creation
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
+- **sessions**: Tracks active user sessions.
+  - `id`: Session ID
+  - `user_id`: References `users.id`
+  - `expires_at`: When the session expires
 
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
+- **verifications** (example extension for Discord verification)
+  - `id`: Unique record ID
+  - `discord_id`: User’s Discord ID
+  - `ip_address`: Encrypted IP address
+  - `status`: Verification status (`pending`, `success`, `failed`)
+  - `created_at`, `updated_at`: Timestamps
 
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
-
-### SQL Schema (PostgreSQL)
+**SQL Schema (PostgreSQL)**
 ```sql
--- Users table
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  hashed_password TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Sessions table
 CREATE TABLE sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  id UUID PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Dashboard items table
-CREATE TABLE dashboard_items (
+CREATE TABLE verifications (
   id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  discord_id VARCHAR(50) NOT NULL,
+  ip_address BYTEA NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-```  
+```
 
 ## 4. API Design and Endpoints
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+**Approach**
+- RESTful API using Next.js API routes.
+- Request and response bodies validated with TypeScript types and optionally Zod.
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+**Key Endpoints**
+- **POST /api/auth/sign-up**
+  - Purpose: Register a new user.
+  - Input: `{ email, password }`
+  - Actions: Validate input, hash password, store user in DB.
+  - Response: Success or error message.
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+- **POST /api/auth/sign-in**
+  - Purpose: Authenticate existing user.
+  - Input: `{ email, password }`
+  - Actions: Verify credentials, create session.
+  - Response: Session token or error.
+
+- **GET /api/auth/session**
+  - Purpose: Retrieve current session info.
+  - Input: Session cookie or header.
+  - Actions: Validate session, fetch user.
+  - Response: User profile or unauthorized.
+
+- **POST /api/auth/sign-out**
+  - Purpose: End user session.
+  - Actions: Destroy session record.
+  - Response: Confirmation.
+
+- **POST /api/verify** (optional extension)
+  - Purpose: Handle Discord/CAPTCHA verification.
+  - Input: `{ discord_id, captcha_token }`
+  - Actions: Validate CAPTCHA, encrypt IP, insert into `verifications`, send webhook.
+  - Response: Verification status.
 
 ## 5. Hosting Solutions
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
+**Primary Environment**
+- **Vercel**
+  - Serverless deployment of Next.js frontend and API routes.
+  - Built-in CDN, automatic SSL, and global edge network.
+  - Benefit: Zero-configuration deploys, instant scaling, and minimal operational overhead.
 
-- **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+**Secondary / Local Development**
+- **Docker & Docker Compose**
+  - Services:
+    - `app`: Next.js application container
+    - `postgres`: Official PostgreSQL container
+  - Benefit: Reproducible environments on any machine, easy onboarding.
 
 ## 6. Infrastructure Components
 
-- **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
-
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
-
-- **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
-
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
-
-- **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+- **Load Balancer**: Handled by Vercel’s edge network for global traffic distribution.
+- **Caching**:
+  - **CDN**: Vercel’s built-in CDN for static assets and cached SSR pages.
+  - **API Caching**: Configurable via Next.js `cache` settings.
+- **Container Network**: Docker Compose network isolates app and database.
+- **Content Delivery**: Static assets and images are served through Vercel’s asset optimizer.
 
 ## 7. Security Measures
 
-- **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
-
+- **Authentication & Sessions**
+  - Better Auth library for secure sign-in/up flows.
+  - HTTP-only, secure cookies for session tokens.
+- **Password Handling**
+  - Passwords hashed with a strong algorithm (e.g., bcrypt).
 - **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
-
-- **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
-
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+  - Sensitive fields (e.g., IP addresses) can be encrypted before storage using a library like `crypto`.
+- **Transport Security**
+  - HTTPS enforced by Vercel.
+- **Environment Secrets**
+  - All API keys, database credentials, and encryption keys stored in environment variables (`.env`).
+- **Rate Limiting** (recommended extension)
+  - Use a middleware or third-party service to prevent abuse of endpoints like `/verify`.
 
 ## 8. Monitoring and Maintenance
 
-- **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
-
 - **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
-
+  - Server-side logs captured via Next.js’s built-in logging or a library like `winston`.
+- **Error Tracking**
+  - Integrate Sentry or LogRocket for real-time error reporting.
+- **Performance Metrics**
+  - Vercel Analytics for monitoring response times and traffic patterns.
 - **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
-
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+  - Docker health checks for PostgreSQL container.
+- **Updates & Patches**
+  - Regular dependency audits (e.g., `npm audit`).
+  - Schema migrations managed via Drizzle’s migration tool.
 
 ## 9. Conclusion and Overall Backend Summary
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+The backend of "Exotic Roleplay Gateway" combines Next.js API routes, TypeScript, Better Auth, and PostgreSQL (via Drizzle ORM) to deliver a scalable, maintainable, and secure foundation. Containerization with Docker ensures consistent development environments, while deployment on Vercel provides global edge performance and minimal ops overhead. The clear separation of concerns—from API handlers and authentication logic to database schemas—makes this starter kit a strong blueprint for building user-gated applications, including custom verification flows such as Discord or CAPTCHA checks.

@@ -1,90 +1,136 @@
-# Tech Stack Document
+# Tech Stack Document for Exotic Roleplay Gateway
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+This document explains, in everyday language, the technology choices behind the Exotic Roleplay Gateway starter template. Our goal is to clarify why each tool or framework was picked and how it helps build a secure, reliable, and easy-to-use web application.
 
-## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
+## Frontend Technologies
 
-- **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+We chose a modern set of tools to build the part of the app you see and interact with.
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+• **Next.js (App Router)**
+  - Provides both server-side rendering (SSR) and static site generation (SSG).  
+  - Lets us build pages and APIs in the same project, simplifying development.
 
-## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
+• **TypeScript**  
+  - Adds clear “types” to JavaScript to catch mistakes early.  
+  - Makes the code easier to understand and maintain over time.
 
-- **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+• **React & React Hooks**  
+  - Powers all the interactive parts of the UI.  
+  - Hooks (like `useState` and `useEffect`) let us manage data and side effects in a simple, organized way.
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+• **shadcn/ui**  
+  - A ready-made collection of React components (buttons, inputs, cards, etc.) that look good out of the box.  
+  - Fully accessible and customizable so we can match any design quickly.
 
-## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
+• **Tailwind CSS v4**  
+  - A “utility-first” styling framework that keeps our CSS small and consistent.  
+  - Lets us tweak layouts, colors, and spacing fast, without writing a lot of custom CSS.
 
-- **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+• **Adaptive Theming (Light & Dark Mode)**  
+  - Automatically follows the user’s system preference for light or dark.  
+  - Ensures a comfortable experience day or night.
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+These choices ensure the interface is fast, responsive, and easy to evolve as needs change.
 
-## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
+## Backend Technologies
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+Behind the scenes, these tools handle data, security, and business logic.
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+• **Next.js API Routes**  
+  - Built-in endpoints that let us write server code alongside the frontend.  
+  - Ideal for handling form submissions and protected dashboard routes without a separate server.
 
-## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
+• **Better Auth**  
+  - Manages user sign-up, sign-in, and session storage.  
+  - Offers configurable flows so we can add extra steps (CAPTCHA, email checks) down the line.
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+• **PostgreSQL**  
+  - A reliable, open-source relational database for storing user records, sessions, and any custom data.  
+  - Well supported and battle-tested for production workloads.
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
+• **Drizzle ORM**  
+  - A type-safe layer on top of PostgreSQL, so database queries look and feel like TypeScript code.  
+  - Catches schema mismatches early and helps us write safer database logic.
 
-These strategies work together to give users a fast, secure experience every time.
+• **TypeScript on the Server**  
+  - Extends the benefits of type safety into our backend code.  
+  - Puts request and response structures under compile-time checks, reducing runtime errors.
 
-## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
+Together, these components ensure users are authenticated securely and their data is stored and retrieved reliably.
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+## Infrastructure and Deployment
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+We designed the infrastructure for consistency, scalability, and easy hand-off between development and production.
+
+• **Docker & Docker Compose**  
+  - Wraps the application and database in containers, so everyone runs the same setup locally and in production.  
+  - Simplifies environment setup—no more “But it works on my machine” problems.
+
+• **Vercel Hosting**  
+  - Seamlessly deploys Next.js projects with zero-config.  
+  - Provides automatic global CDN, continuous deploys on each Git push, and built-in caching for speed.
+
+• **Git & Version Control**  
+  - All code is tracked in Git, ensuring a clear history of changes and easy collaboration.  
+  - Branching workflows allow us to test new features safely before merging to production.
+
+• **Environment Variables**  
+  - Secrets (API keys, database URLs) live in `.env` files locally and in Vercel’s dashboard in production.  
+  - Keeps sensitive data out of source control and fine-grained per-environment configuration.
+
+These infrastructure choices make onboarding new developers quick, keep deployments predictable, and allow the app to grow without major rework.
+
+## Third-Party Integrations
+
+A few key services plug into our system to handle specialized tasks.
+
+• **Better Auth**  
+  - Outsources the complexity of secure authentication and session management.  
+  - Easily configurable for future multi-factor or third-party login providers.
+
+• **shadcn/ui**  
+  - Accelerates UI development with polished, accessible components maintained by an active community.
+
+• **Vercel Platform**  
+  - Provides analytics, automatic rollbacks, and preview URLs on each pull request.  
+  - Integrates with Git providers for smooth CI/CD.
+
+• **Drizzle ORM**  
+  - Connects to PostgreSQL under the hood, giving us the benefits of a full-featured ORM with modern TypeScript support.
+
+These integrations let us focus on delivering unique features instead of building every piece from scratch.
+
+## Security and Performance Considerations
+
+We’ve baked in best practices to keep data safe and pages snappy.
+
+• **Secure Authentication**  
+  - Better Auth handles password hashing, session cookies, and CSRF protection.  
+  - Route protection ensures only logged-in users can access the dashboard.
+
+• **End-to-End Type Safety**  
+  - TypeScript and Drizzle ORM catch type mismatches before they hit production, reducing bugs.
+
+• **Server-Side Rendering & Static Generation**  
+  - Next.js pre-renders pages when possible.  
+  - Reduces time-to-first-byte and improves SEO and accessibility.
+
+• **Container Isolation**  
+  - Docker containers sandbox services, limiting the blast radius of any misconfiguration.
+
+• **Environment-Based Secrets**  
+  - Credentials and API keys never live in code, minimizing exposure risk.
+
+Together, these measures protect user data and keep the experience smooth, even under load.
+
+## Conclusion and Overall Tech Stack Summary
+
+Exotic Roleplay Gateway brings together a set of proven, developer-friendly technologies to deliver a secure, performant, and easy-to-maintain web application starter:
+
+- Frontend: Next.js, React, TypeScript, Tailwind CSS, shadcn/ui  
+- Backend: Next.js API Routes, Better Auth, PostgreSQL, Drizzle ORM, TypeScript  
+- Infrastructure: Docker, Docker Compose, Vercel, Git, environment variables  
+- Integrations: Better Auth, shadcn/ui, Drizzle ORM, Vercel services  
+- Security & Performance: SSR/SSG, type safety, containerization, secrets management
+
+This carefully chosen stack ensures rapid development, consistent environments, strong security, and an excellent user experience. It also serves as a flexible blueprint—whether you’re building a simple verification page or a full-featured dashboard, you’ll have a solid foundation to build on.
