@@ -1,117 +1,99 @@
-# Project Requirements Document: codeguide-starter
-
----
+# Project Requirements Document: Exotic Roleplay Gateway
 
 ## 1. Project Overview
 
-The **codeguide-starter** project is a boilerplate web application that provides a ready-made foundation for any web project requiring secure user authentication and a post-login dashboard. It sets up the common building blocks—sign-up and sign-in pages, API routes to handle registration and login, and a simple dashboard interface driven by static data. By delivering this skeleton, it accelerates development time and ensures best practices are in place from day one.
+Exotic Roleplay Gateway is a lightweight user-gating and verification service designed to sit in front of Discord roleplay servers and ensure only human users pass through. It presents a simple web form where a user completes a CAPTCHA challenge and submits their Discord ID. On the backend, this information is validated, encrypted, stored in a PostgreSQL database, and—in the case of successful verification—a webhook fires to your Discord channel, assigning roles or sending alerts.
 
-This starter kit is being built to solve the friction developers face when setting up repeated common tasks: credential handling, session management, page routing, and theming. Key objectives include: 1) delivering a fully working authentication flow (registration & login), 2) providing a gated dashboard area upon successful login, 3) establishing a clear, maintainable project structure using Next.js and TypeScript, and 4) demonstrating a clean theming approach with global and section-specific CSS. Success is measured by having an end-to-end login journey in under 200 lines of code and zero runtime type errors.
-
----
+We’re building this service to automate and secure the onboarding process for private or gated Discord communities. By handling human verification, data encryption, and Discord webhook integration in one containerized microservice, server owners can avoid spam, bot attacks, and manual role assignment. Key objectives include accuracy of CAPTCHA validation, data confidentiality (encrypted IP storage), reliable webhook delivery, and a developer‐friendly architecture that can be adapted to other frameworks or languages in the future.
 
 ## 2. In-Scope vs. Out-of-Scope
 
-### In-Scope (Version 1)
-- User registration (sign-up) form with validation
-- User login (sign-in) form with validation
-- Next.js API routes under `/api/auth/route.ts` handling:
-  - Credential validation
-  - Password hashing (e.g., bcrypt)
-  - Session creation or JWT issuance
-- Protected dashboard pages under `/dashboard`:
-  - `layout.tsx` wrapping dashboard content
-  - `page.tsx` rendering static data from `data.json`
-- Global application layout in `/app/layout.tsx`
-- Basic styling via `globals.css` and `dashboard/theme.css`
-- TypeScript strict mode enabled
+**In-Scope (First Version):**
+- A static `verify.html` form that accepts:
+  - Discord ID (text input)
+  - CAPTCHA widget (Google reCAPTCHA or hCaptcha)
+  - Submit button
+- FastAPI backend with a single `/verify` POST endpoint to:
+  1. Validate the CAPTCHA server-side
+  2. Encrypt the user’s IP address using Fernet
+  3. Persist `discord_id`, `ip_address`, `user_agent`, and timestamp in PostgreSQL via SQLModel
+  4. Send a success or failure payload to a Discord webhook URL
+- Dockerfile and `docker-compose.yml` for reproducible local/dev environment (FastAPI + Postgres)
+- Environment variable support via `.env` (e.g., `DATABASE_URL`, `FERNET_KEY`, `DISCORD_WEBHOOK_URL`, `CAPTCHA_SECRET`)
+- Basic rate limiting on `/verify` (e.g., 5 requests per minute per IP) using `slowapi` or similar
+- Logging of all verification attempts (success/failure) to stdout in JSON format
 
-### Out-of-Scope (Later Phases)
-- Integration with a real database (PostgreSQL, MongoDB, etc.)
-- Advanced authentication flows (password reset, email verification, MFA)
-- Role-based access control (RBAC)
-- Multi-tenant or white-label theming
-- Unit, integration, or end-to-end testing suites
-- CI/CD pipeline and production deployment scripts
-
----
+**Out-of-Scope (Later Phases):**
+- React or Next.js front-end rewrite—only a static HTML/JS page for v1
+- Role assignment logic inside Discord (beyond firing the webhook)
+- Multi-step or multi-factor authentication flows
+- Analytics dashboard or admin interface
+- Multi-language or theming support for the form
+- User accounts, sign-in, or session management beyond request-level verification
 
 ## 3. User Flow
 
-A new visitor lands on the root URL and sees a welcome page with options to **Sign Up** or **Sign In**. If they choose Sign Up, they fill in their email, password, and hit “Create Account.” The form submits to `/api/auth/route.ts`, which hashes the password, creates a new user session or token, and redirects them to the dashboard. If any input is invalid, an inline error message explains the issue (e.g., “Password too short”).
+A new or unverified user navigates to `https://gateway.example.com/verify.html`. They see a simple form with two fields: “Discord ID” and the CAPTCHA widget. After entering their Discord tag or numeric ID and completing the CAPTCHA, they click **Verify**. The page shows a loading spinner while it sends a POST request to `/verify` with the form data and client metadata.
 
-Once authenticated, the user is taken to the `/dashboard` route. Here they see a sidebar or header defined by `dashboard/layout.tsx`, and the main panel pulls in static data from `data.json`. They can log out (if that control is present), but otherwise their entire session is managed by server-side cookies or tokens. Returning users go directly to Sign In, submit credentials, and upon success they land back on `/dashboard`. Any unauthorized access to `/dashboard` redirects back to Sign In.
-
----
+On the backend, FastAPI validates the CAPTCHA token with the provider’s API. If the token is valid, the service encrypts the client’s IP address, stores all relevant fields in PostgreSQL, and triggers a Discord webhook notifying the server or assigning a role. The endpoint returns a JSON response `{ success: true, message: 'Verified!' }`. If validation fails (invalid CAPTCHA, database error, rate limit exceeded), the response is `{ success: false, message: 'Verification failed: REASON' }`. The front-end displays this message and allows the user to retry if needed.
 
 ## 4. Core Features
 
-- **Sign-Up Page (`/app/sign-up/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Sign-In Page (`/app/sign-in/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Authentication API (`/app/api/auth/route.ts`)**: Handles both registration and login based on HTTP method, integrates password hashing (bcrypt) and session or JWT logic.
-- **Global Layout (`/app/layout.tsx` + `globals.css`)**: Shared header, footer, and CSS resets across all pages.
-- **Dashboard Layout (`/app/dashboard/layout.tsx` + `dashboard/theme.css`)**: Sidebar or top nav for authenticated flows, section-specific styling.
-- **Dashboard Page (`/app/dashboard/page.tsx`)**: Reads `data.json`, renders it as cards or tables.
-- **Static Data Source (`/app/dashboard/data.json`)**: Example dataset to demo dynamic rendering.
-- **TypeScript Configuration**: `tsconfig.json` with strict mode and path aliases (if any).
-
----
+- **Static Verification Form**: `verify.html` + vanilla JavaScript to call `/verify`
+- **CAPTCHA Validation**: supports Google reCAPTCHA v2/v3 or hCaptcha
+- **FastAPI Endpoint**: `/verify` handles request parsing, validation, encryption, DB insertion, webhook call
+- **Encryption**: AES-128 via Fernet (Python `cryptography` library) to protect `ip_address`
+- **Database**: PostgreSQL accessed using SQLModel (built on SQLAlchemy + Pydantic)
+- **Webhook Integration**: HTTP POST to Discord webhook URL with customizable payload
+- **Rate Limiting**: configurable limits per IP using `slowapi` or equivalent
+- **Logging**: structured JSON logs at INFO and ERROR levels
+- **Environment Configuration**: `.env` support for secrets and URLs
+- **Containerization**: Docker + Docker Compose for both FastAPI and PostgreSQL
 
 ## 5. Tech Stack & Tools
 
-- **Framework**: Next.js (App Router) for file-based routing, SSR/SSG, and API routes.
-- **Language**: TypeScript for type safety.
-- **UI Library**: React 18 for component-based UI.
-- **Styling**: Plain CSS via `globals.css` (global reset) and `theme.css` (sectional styling). Can easily migrate to CSS Modules or Tailwind in the future.
-- **Backend**: Node.js runtime provided by Next.js API routes.
-- **Password Hashing**: bcrypt (npm package).
-- **Session/JWT**: NextAuth.js or custom JWT logic (to be decided in implementation).
-- **IDE & Dev Tools**: VS Code with ESLint, Prettier extensions. Optionally, Cursor.ai for AI-assisted coding.
-
----
+- **Backend Framework**: FastAPI (Python 3.10+)
+- **Data Models & Validation**: Pydantic via SQLModel
+- **Database**: PostgreSQL 15
+- **Encryption**: `cryptography` (Fernet symmetric encryption)
+- **Rate Limiting**: `slowapi` or `starlette-limiter`
+- **HTTP Client**: `httpx` for Discord webhook calls
+- **Environment Management**: `python-dotenv` or Pydantic Settings
+- **Containerization**: Docker, Docker Compose
+- **Development IDEs/Plugins** (suggested):
+  - VS Code with Pylance and Docker extensions
+  - PyCharm Professional with Docker plugin
+- **Testing**: `pytest` + `httpx` for endpoint tests
 
 ## 6. Non-Functional Requirements
 
-- **Performance**: Initial page load under 200 ms on a standard broadband connection. API responses under 300 ms.
-- **Security**:
-  - HTTPS only in production.
-  - Proper CORS, CSRF protection for API routes.
-  - Secure password storage (bcrypt with salt).
-  - No credentials or secrets checked into version control.
-- **Scalability**: Structure must support adding database integration, caching layers, and advanced auth flows without rewiring core app.
-- **Usability**: Forms should give real-time feedback on invalid input. Layout must be responsive (mobile > 320 px).
-- **Maintainability**: Code must adhere to TypeScript strict mode. Linting & formatting enforced by ESLint/Prettier.
-
----
+- **Performance:** `/verify` endpoint must respond within 300ms under typical conditions (excluding third-party CAPTCHA API latency).
+- **Scalability:** Able to handle bursts of 100 requests/minute with horizontal scaling.
+- **Security:**
+  - All secrets stored in environment variables.
+  - HTTPS enforced at deployment (outside scope of service itself).
+  - Rate limiting to prevent abuse.
+  - Encrypted IP data at rest.
+- **Reliability:** 99.9% uptime for the `/verify` endpoint.
+- **Usability:** Single-page form must load in under 1 second on 3G networks.
+- **Compliance:** GDPR-friendly (no personal data beyond Discord IDs and encrypted IPs).
 
 ## 7. Constraints & Assumptions
 
-- **No Database**: Dashboard uses only `data.json`; real database integration is deferred.
-- **Node Version**: Requires Node.js >= 14.
-- **Next.js Version**: Built on Next.js 13+ App Router.
-- **Authentication**: Assumes availability of bcrypt or NextAuth.js at implementation time.
-- **Hosting**: Targets serverless or Node.js-capable hosting (e.g., Vercel, Netlify).
-- **Browser Support**: Modern evergreen browsers; no IE11 support required.
-
----
+- We assume availability of a stable CAPTCHA service account (reCAPTCHA or hCaptcha) and valid site/secret keys.
+- Discord webhook URL permits unlimited posts or is rate-limited beyond our expected usage.
+- Hosting environment will provide TLS termination; the service can run on HTTP internally.
+- PostgreSQL credentials and migrations will be managed separately by DevOps.
+- No existing user management system; all state is per-request verification logs.
 
 ## 8. Known Issues & Potential Pitfalls
 
-- **Static Data Limitation**: `data.json` is only for demo. A real API or database will be needed to avoid stale data.
-  *Mitigation*: Define a clear interface for data fetching so swapping to a live endpoint is trivial.
-
-- **Global CSS Conflicts**: Using global styles can lead to unintended overrides.
-  *Mitigation*: Plan to migrate to CSS Modules or utility-first CSS in Phase 2.
-
-- **API Route Ambiguity**: Single `/api/auth/route.ts` handling both sign-up and sign-in could get complex.
-  *Mitigation*: Clearly branch on HTTP method (`POST /register` vs. `POST /login`) or split into separate files.
-
-- **Lack of Testing**: No test suite means regressions can slip in.
-  *Mitigation*: Build a minimal Jest + React Testing Library setup in an early iteration.
-
-- **Error Handling Gaps**: Client and server must handle edge cases (network failures, malformed input).
-  *Mitigation*: Define a standard error response schema and show user-friendly messages.
+- **CAPTCHA Downtime or Latency:** If CAPTCHA provider is slow or down, `/verify` will fail. Mitigation: implement a short timeout (5s) and clear error messaging.
+- **Discord Webhook Rate Limits:** Discord limits webhooks to ~30 requests/minute. Mitigation: queue retries with exponential backoff or batch notifications where possible.
+- **Data Encryption Key Rotation:** Fernet keys may need rotation. Mitigation: plan for multiple active keys in env and write code to decrypt old entries.
+- **Database Connection Pooling:** Under high load, too many connections can exhaust Postgres. Mitigation: configure SQLModel/SQLAlchemy pool size and timeouts.
+- **Single Endpoint Bottleneck:** `/verify` handles multiple tasks. Mitigation: consider splitting encryption, DB write, and webhook into background tasks (e.g., Celery) in future phases.
 
 ---
 
-This PRD should serve as the single source of truth for the AI model or any developer generating the next set of technical documents: Tech Stack Doc, Frontend Guidelines, Backend Structure, App Flow, File Structure, and IDE Rules. It contains all functional and non-functional requirements with no ambiguity, enabling seamless downstream development.
+This document fully defines the first-phase requirements and architecture for the Exotic Roleplay Gateway. It provides clear guidance on functionality, technology choices, and potential risks, enabling downstream teams or AI-driven documentation to generate implementation blueprints without ambiguity.
